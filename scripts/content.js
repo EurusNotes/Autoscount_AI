@@ -6,6 +6,18 @@
   // Avoid duplicate injection on the same page
   if (document.getElementById(CARD_ID)) return;
 
+  // Guard: returns false if the extension was reloaded/invalidated while this
+  // content script is still running on the tab.
+  function isExtensionAlive() {
+    try { return !!chrome.runtime?.id; } catch (_) { return false; }
+  }
+
+  // Clean up all injected UI and stop any further activity when context dies
+  function handleContextInvalidated() {
+    document.getElementById(CARD_ID)?.remove();
+    document.getElementById(TRIGGER_ID)?.remove();
+  }
+
   // ── JD extraction ──────────────────────────────────────────────────────────
 
   function cleanText(raw) {
@@ -345,24 +357,34 @@
     const jobTitle = extractJobTitle();
     const card = buildCard(jobTitle);
 
-    chrome.runtime.sendMessage({ action: 'analyze_jd', text: jdText }, (response) => {
-      if (chrome.runtime.lastError) {
-        renderError(card, chrome.runtime.lastError.message || 'Extension communication error');
-        restoreTriggerButton();
-        return;
-      }
-      if (response?.error) {
-        renderError(card, response.error);
-        restoreTriggerButton();
-        return;
-      }
-      if (response?.result) {
-        renderResult(card, response.result);
-      } else {
-        renderError(card, 'No valid response received.');
-      }
+    if (!isExtensionAlive()) {
+      renderError(card, 'Extension was reloaded — please refresh this page.');
       restoreTriggerButton();
-    });
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage({ action: 'analyze_jd', text: jdText }, (response) => {
+        if (chrome.runtime.lastError) {
+          renderError(card, chrome.runtime.lastError.message || 'Extension communication error');
+          restoreTriggerButton();
+          return;
+        }
+        if (response?.error) {
+          renderError(card, response.error);
+          restoreTriggerButton();
+          return;
+        }
+        if (response?.result) {
+          renderResult(card, response.result);
+        } else {
+          renderError(card, 'No valid response received.');
+        }
+        restoreTriggerButton();
+      });
+    } catch (_) {
+      renderError(card, 'Extension was reloaded — please refresh this page.');
+      restoreTriggerButton();
+    }
   }
 
   // ── Job title extraction ───────────────────────────────────────────────────
@@ -464,6 +486,8 @@
 
   // Decide auto vs manual based on stored setting
   function waitAndRun() {
+    if (!isExtensionAlive()) return;
+    try {
     chrome.storage.local.get('autoMode', ({ autoMode }) => {
       if (!isJobPage()) {
         // Page not recognised as a job listing — always show manual button
@@ -490,6 +514,7 @@
       });
       observer.observe(document.body, { childList: true, subtree: true });
     });
+    } catch (_) { handleContextInvalidated(); }
   }
 
   // ── SPA navigation (LinkedIn changes URL without page reload) ──────────────
@@ -498,6 +523,7 @@
 
   function onUrlChange() {
     if (location.href === lastTrackedUrl) return;
+    if (!isExtensionAlive()) { handleContextInvalidated(); return; }
     lastTrackedUrl = location.href;
     removeStaleUI();
     setTimeout(waitAndRun, 800);
