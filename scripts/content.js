@@ -318,7 +318,7 @@
       alignItems: 'center',
       gap: '6px',
       padding: '8px 14px',
-      background: '#6c63ff',
+      background: '#16a34a',
       color: '#fff',
       border: 'none',
       borderRadius: '20px',
@@ -326,11 +326,11 @@
       fontWeight: '600',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       cursor: 'pointer',
-      boxShadow: '0 4px 14px rgba(108,99,255,0.4)',
+      boxShadow: '0 4px 14px rgba(22,163,74,0.4)',
       transition: 'background 0.15s, opacity 0.15s',
     });
-    btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.background = '#5a52e0'; });
-    btn.addEventListener('mouseleave', () => { btn.style.background = '#6c63ff'; });
+    btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.background = '#15803d'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = '#16a34a'; });
     btn.addEventListener('click', () => {
       // Disable button while analyzing; it will be restored when analysis finishes
       btn.disabled = true;
