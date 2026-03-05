@@ -364,22 +364,32 @@
     }
     try {
       chrome.runtime.sendMessage({ action: 'analyze_jd', text: jdText }, (response) => {
-        if (chrome.runtime.lastError) {
-          renderError(card, chrome.runtime.lastError.message || 'Extension communication error');
+        // Guard inside the async callback — context may have died by the time
+        // this fires, making chrome.runtime.lastError itself throw a TypeError.
+        try {
+          if (!isExtensionAlive() || chrome.runtime.lastError) {
+            const msg = isExtensionAlive()
+              ? (chrome.runtime.lastError?.message || 'Extension communication error')
+              : 'Extension was reloaded — please refresh this page.';
+            renderError(card, msg);
+            restoreTriggerButton();
+            return;
+          }
+          if (response?.error) {
+            renderError(card, response.error);
+            restoreTriggerButton();
+            return;
+          }
+          if (response?.result) {
+            renderResult(card, response.result);
+          } else {
+            renderError(card, 'No valid response received.');
+          }
           restoreTriggerButton();
-          return;
-        }
-        if (response?.error) {
-          renderError(card, response.error);
+        } catch (_) {
+          renderError(card, 'Extension was reloaded — please refresh this page.');
           restoreTriggerButton();
-          return;
         }
-        if (response?.result) {
-          renderResult(card, response.result);
-        } else {
-          renderError(card, 'No valid response received.');
-        }
-        restoreTriggerButton();
       });
     } catch (_) {
       renderError(card, 'Extension was reloaded — please refresh this page.');
