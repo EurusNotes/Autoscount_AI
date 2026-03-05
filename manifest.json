@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "AutoScout AI",
+  "version": "1.0.0",
+  "description": "自动评估招聘职位与你的个人画像匹配程度，实时注入红绿灯评估卡片。",
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.seek.com.au/*",
+    "*://*.linkedin.com/*"
+  ],
+  "background": {
+    "service_worker": "scripts/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.seek.com.au/*",
+        "*://*.linkedin.com/*"
+      ],
+      "js": ["scripts/content.js"],
+      "css": ["scripts/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoScout AI</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <img src="../icons/icon48.png" alt="AutoScout AI" class="logo-icon" />
+        <div>
+          <h1 class="title">AutoScout AI</h1>
+          <p class="subtitle">Smart Job Match Assistant</p>
+        </div>
+      </div>
+    </header>
+
+    <form id="profileForm" class="form">
+
+      <!-- Step 1: API Key -->
+      <div class="section-label">
+        <span class="step-badge">1</span> API Configuration
+      </div>
+
+      <div class="field">
+        <label for="apiKey">Gemini API Key</label>
+        <div class="input-wrapper">
+          <input
+            type="password"
+            id="apiKey"
+            name="apiKey"
+            placeholder="AIza..."
+            autocomplete="off"
+          />
+          <button type="button" class="toggle-visibility" data-target="apiKey" title="Show / Hide">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <p class="field-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></p>
+      </div>
+
+      <!-- Step 2: Resume upload (reads key from input above, no save needed) -->
+      <div class="section-label">
+        <span class="step-badge">2</span> Resume
+        <span class="section-hint">Auto-fill profile from PDF</span>
+      </div>
+
+      <div class="resume-section">
+        <label class="btn-upload" for="resumeFile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span id="uploadLabel">Upload PDF Resume</span>
+        </label>
+        <input type="file" id="resumeFile" accept=".pdf" style="display:none" />
+        <div id="parseStatus" class="parse-status"></div>
+      </div>
+
+      <!-- Step 3: Profile fields -->
+      <div class="section-label">
+        <span class="step-badge">3</span> Your Profile
+        <span class="section-hint">Review and edit before saving</span>
+      </div>
+
+      <div class="field">
+        <label for="education">Education</label>
+        <input
+          type="text"
+          id="education"
+          name="education"
+          placeholder="e.g. UNSW Master of IT"
+        />
+      </div>
+
+      <div class="field">
+        <label for="visaStatus">Visa Status</label>
+        <input
+          type="text"
+          id="visaStatus"
+          name="visaStatus"
+          placeholder="e.g. 485 visa, full work rights"
+        />
+      </div>
+
+      <div class="field">
+        <label for="targetRole">Target Role</label>
+        <input
+          type="text"
+          id="targetRole"
+          name="targetRole"
+          placeholder="e.g. AI Engineer, Data Scientist"
+        />
+      </div>
+
+      <div class="field">
+        <label for="skills">Core Skills</label>
+        <input
+          type="text"
+          id="skills"
+          name="skills"
+          placeholder="e.g. Python, LLM, Machine Learning"
+        />
+      </div>
+
+      <div class="field">
+        <label for="experience">Experience Level</label>
+        <input
+          type="text"
+          id="experience"
+          name="experience"
+          placeholder="e.g. 0–1 year / 2–3 years"
+        />
+      </div>
+
+      <div class="field">
+        <label for="workHistory">Work & Project History</label>
+        <textarea
+          id="workHistory"
+          name="workHistory"
+          rows="4"
+          placeholder="e.g. 1 yr as ML Engineer at Acme — built recommendation engine. Final year project: LLM-based code reviewer."
+        ></textarea>
+      </div>
+
+      <button type="submit" class="btn-save" id="saveBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Save Profile
+      </button>
+    </form>
+
+    <!-- Analysis Mode moved to bottom — it's a preference, not a setup step -->
+    <div class="mode-section">
+      <div class="mode-info">
+        <span class="mode-label">Analysis Mode</span>
+        <span class="mode-desc" id="modeDesc">Loading...</span>
+      </div>
+      <label class="toggle-switch" title="Toggle auto / manual mode">
+        <input type="checkbox" id="autoModeToggle" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
