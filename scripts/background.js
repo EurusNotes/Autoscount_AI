@@ -13,12 +13,30 @@ function buildSystemPrompt(profile) {
   const workLine = profile.workHistory
     ? `\nWork/Projects: ${profile.workHistory.slice(0, 400)}`
     : '';
-  return `You are a strict IT recruiter. Evaluate how well the given JD matches the candidate and output JSON only.
+  return `You are a strict Australian IT recruiter. Evaluate how well the given JD matches the candidate and output JSON only.
 Candidate: education=${profile.education || 'unknown'} | visa=${profile.visaStatus || 'unknown'} | target=${profile.targetRole || 'unknown'} | skills=${profile.skills || 'unknown'} | experience=${profile.experience || 'unknown'}${workLine}
-Hard-fail rules (set status to FAIL): JD requires "Australian Citizen only", "PR only", "permanent resident", or "Baseline clearance" and candidate visa does not qualify; OR JD requires "Senior", "Lead", or "5+ years" and candidate experience is insufficient.
-Output strict JSON (no Markdown): {"status":"PASS|WARNING|FAIL","match_score":0-100,"role_score":0-100,"skills_score":0-100,"experience_score":0-100,"visa_ok":true,"visa_check":"...","experience_check":"...","reason":{"pros":["strength 1"],"cons":["gap 1"]}}
-visa_ok must be false if the JD restricts to Australian Citizen/PR/permanent resident/Baseline clearance and candidate visa does not qualify, otherwise true.
-reason.pros = list of 1–3 concrete match strengths (omit array if none). reason.cons = list of 1–3 concrete gaps or concerns (omit array if none). Each item must be one concise sentence. No full paragraphs.`;
+
+Australian work rights reference (use this to evaluate visa_ok):
+FULL work rights (qualifies for any role requiring "full work rights", "unrestricted work rights", or "must have right to work"):
+  - Australian Citizen
+  - Permanent Resident (PR) — subclass 189, 190, 186, 187, 887, 100, etc.
+  - New Zealand Citizen (subclass 444)
+  - Subclass 485 (Graduate Temporary / Post-Study Work) — unlimited hours, any employer
+  - Partner/Spouse visa with full work conditions (subclass 820, 801, 309, 100)
+  - Bridging visa A or B with work rights granted
+LIMITED or NO work rights (does NOT satisfy "full work rights"):
+  - Student visa (subclass 500) — capped at 48 hrs/fortnight during semester
+  - Working Holiday (417/462) — employer and duration restrictions apply; flag as WARNING not automatic FAIL unless JD explicitly excludes WHV
+  - Tourist/visitor visa — no work rights
+RESTRICTED roles — set visa_ok=false if JD requires any of:
+  - "Australian Citizen only", "must be Australian Citizen", "Citizen only"
+  - "Permanent Resident", "PR or Citizen", "PR only"
+  - "Baseline/NV1/NV2/PV security clearance" (requires citizenship)
+
+Hard-fail rules (set status=FAIL): visa is restricted AND candidate does not qualify; OR JD requires "Senior", "Lead", or "5+ years" and candidate experience is clearly insufficient.
+Output strict JSON (no Markdown): {"status":"PASS|WARNING|FAIL","match_score":0-100,"role_score":0-100,"skills_score":0-100,"experience_score":0-100,"visa_ok":true|false,"visa_check":"one sentence explaining the visa assessment","experience_check":"...","reason":{"pros":["strength 1"],"cons":["gap 1"]}}
+visa_ok=false only when the JD explicitly restricts to citizens/PR/clearance and the candidate visa does not qualify. If JD says "full work rights" and candidate holds 485 or PR, visa_ok=true.
+reason.pros = 1–3 concrete match strengths (omit if none). reason.cons = 1–3 concrete gaps (omit if none). One concise sentence each.`;
 }
 
 // ── Gemini API call ───────────────────────────────────────────────────────────
@@ -42,7 +60,7 @@ async function callLLM(apiKey, systemPrompt, jdText) {
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
-        maxOutputTokens: 400,
+        maxOutputTokens: 450,
       },
     }),
   });
