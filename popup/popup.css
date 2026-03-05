@@ -443,3 +443,24 @@ textarea:focus {
 .toast.error {
   background: #dc2626;
 }
+
+/* Footer feedback link */
+.popup-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  text-align: center;
+}
+
+.popup-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.popup-footer a:hover {
+  color: var(--accent);
+}
