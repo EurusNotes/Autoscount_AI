@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AutoScout AI",
-  "version": "1.0.0",
-  "description": "自动评估招聘职位与你的个人画像匹配程度，实时注入红绿灯评估卡片。",
+  "version": "1.1.0",
+  "description": "Automatically evaluates job listings against your profile and injects a real-time match card.",
   "icons": {
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
@@ -20,7 +20,12 @@
   ],
   "host_permissions": [
     "*://*.seek.com.au/*",
-    "*://*.linkedin.com/*"
+    "*://*.linkedin.com/*",
+    "*://*.indeed.com/*",
+    "*://*.glassdoor.com/*",
+    "*://*.otta.com/*",
+    "*://*.hatch.team/*",
+    "*://*.prosple.com/*"
   ],
   "background": {
     "service_worker": "scripts/background.js"
@@ -29,7 +34,12 @@
     {
       "matches": [
         "*://*.seek.com.au/*",
-        "*://*.linkedin.com/*"
+        "*://*.linkedin.com/*",
+        "*://*.indeed.com/*",
+        "*://*.glassdoor.com/*",
+        "*://*.otta.com/*",
+        "*://*.hatch.team/*",
+        "*://*.prosple.com/*"
       ],
       "js": ["scripts/content.js"],
       "css": ["scripts/content.css"],

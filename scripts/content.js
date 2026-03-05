@@ -8,62 +8,82 @@
 
   // ── JD extraction ──────────────────────────────────────────────────────────
 
-  function extractSeekJD() {
-    // Seek job detail page selectors (may change with site updates)
-    const selectors = [
-      '[data-automation="jobAdDetails"]',
-      '.jobAdDetails',
-      '[class*="jobDescription"]',
-      'article[class*="job"]',
-    ];
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el && el.innerText.trim().length > 100) return el.innerText.trim();
-    }
-    return null;
-  }
-
-  function extractLinkedInJD() {
-    const selectors = [
-      '.jobs-description__content',
-      '.jobs-box__html-content',
-      '[class*="job-description"]',
-      '.description__text',
-    ];
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (el && el.innerText.trim().length > 100) return el.innerText.trim();
-    }
-    return null;
-  }
-
   function cleanText(raw) {
     return raw
-      .replace(/[ \t]+/g, ' ')        // collapse inline whitespace
-      .replace(/\n{3,}/g, '\n\n')      // collapse excessive blank lines
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
-      .slice(0, 2000);                 // hard cap at 2000 chars (~500 tokens)
+      .slice(0, 2000);
+  }
+
+  // Try a list of CSS selectors, return the first match with meaningful text
+  function extractBySelectors(selectors) {
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el?.innerText?.trim().length > 100) return el.innerText.trim();
+    }
+    return null;
+  }
+
+  // Generic fallback: pick the longest content block, then body
+  function extractGenericJD() {
+    const candidates = [...document.querySelectorAll(
+      'article, main, [role="main"], section, ' +
+      '[class*="job-description"], [class*="jobDescription"], ' +
+      '[class*="job-detail"], [id*="job-description"], [id*="jobDescription"]'
+    )];
+    let best = '';
+    for (const el of candidates) {
+      const t = el.innerText?.trim() || '';
+      if (t.length > best.length) best = t;
+    }
+    return best.length >= 100 ? best : null;
   }
 
   function extractJD() {
     const host = window.location.hostname;
     let text = null;
 
-    if (host.includes('seek.com.au')) text = extractSeekJD();
-    else if (host.includes('linkedin.com')) text = extractLinkedInJD();
-
-    // Fallback: grab the longest <article> or <main>
-    if (!text) {
-      const candidates = [...document.querySelectorAll('article, main, [role="main"]')];
-      for (const el of candidates) {
-        const t = el.innerText.trim();
-        if (t.length > (text?.length ?? 0)) text = t;
-      }
+    if (host.includes('seek.com.au')) {
+      text = extractBySelectors([
+        '[data-automation="jobAdDetails"]', '.jobAdDetails',
+        '[class*="jobDescription"]', 'article[class*="job"]',
+      ]);
+    } else if (host.includes('linkedin.com')) {
+      text = extractBySelectors([
+        '.jobs-description__content', '.jobs-box__html-content',
+        '[class*="job-description"]', '.description__text',
+      ]);
+    } else if (host.includes('indeed.com')) {
+      text = extractBySelectors([
+        '#jobDescriptionText', '.jobsearch-jobDescriptionText',
+        '[class*="jobDescriptionText"]', '[class*="jobDescription"]',
+      ]);
+    } else if (host.includes('glassdoor.com')) {
+      text = extractBySelectors([
+        '[class*="JobDetails_jobDescription"]', '[class*="jobDescriptionContent"]',
+        '[class*="desc__"]', '.desc',
+      ]);
+    } else if (host.includes('otta.com')) {
+      text = extractBySelectors([
+        '[class*="JobDescription"]', '[class*="job-description"]',
+        '[class*="RoleDescription"]', 'main',
+      ]);
+    } else if (host.includes('hatch.team')) {
+      text = extractBySelectors([
+        '[class*="job-description"]', '[class*="jobDescription"]',
+        '[class*="role-description"]', '[class*="description"]', 'main',
+      ]);
+    } else if (host.includes('prosple.com')) {
+      text = extractBySelectors([
+        '[class*="job-description"]', '[class*="opportunity-description"]',
+        '[class*="description"]', 'main',
+      ]);
     }
 
-    if (!text || text.length < 100) {
-      text = document.body.innerText.trim();
-    }
+    // Generic fallback for unlisted sites or when site-specific selectors miss
+    if (!text) text = extractGenericJD();
+    if (!text || text.length < 100) text = document.body.innerText.trim();
 
     return cleanText(text);
   }
@@ -350,28 +370,42 @@
   function extractJobTitle() {
     const host = window.location.hostname;
 
-    if (host.includes('seek.com.au')) {
-      const selectors = [
+    const SITE_SELECTORS = {
+      'seek.com.au': [
         '[data-automation="job-detail-title"]',
-        'h1[class*="Title"]',
-        'h1[class*="title"]',
-      ];
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el?.innerText?.trim()) return el.innerText.trim();
-      }
-    }
-
-    if (host.includes('linkedin.com')) {
-      const selectors = [
+        'h1[class*="Title"]', 'h1[class*="title"]',
+      ],
+      'linkedin.com': [
         'h1.jobs-unified-top-card__job-title',
         '.job-details-jobs-unified-top-card__job-title h1',
-        'h1[class*="job-title"]',
-        'h1[class*="jobs"]',
-      ];
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el?.innerText?.trim()) return el.innerText.trim();
+        'h1[class*="job-title"]', 'h1[class*="jobs"]',
+      ],
+      'indeed.com': [
+        'h1.jobsearch-JobInfoHeader-title',
+        'h1[class*="jobTitle"]', 'h1[class*="job-title"]',
+      ],
+      'glassdoor.com': [
+        'h1[class*="JobDetails_jobTitle"]',
+        'h1[class*="title"]', 'h1[data-test="job-title"]',
+      ],
+      'otta.com': [
+        'h1[class*="JobTitle"]', 'h1[class*="job-title"]', 'h1',
+      ],
+      'hatch.team': [
+        'h1[class*="title"]', 'h1[class*="Title"]', 'h1',
+      ],
+      'prosple.com': [
+        'h1[class*="title"]', 'h1[class*="Title"]', 'h1',
+      ],
+    };
+
+    for (const [domain, selectors] of Object.entries(SITE_SELECTORS)) {
+      if (host.includes(domain)) {
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el?.innerText?.trim()) return el.innerText.trim();
+        }
+        break;
       }
     }
 
@@ -382,17 +416,45 @@
 
   // ── URL / job-page detection ───────────────────────────────────────────────
 
+  // Heuristic check for unlisted or unrecognised pages
+  function isGenericJobPage() {
+    const text = (document.body?.innerText || '').toLowerCase();
+    if (text.length < 300) return false;
+    const keywords = [
+      'responsibilities', 'requirements', 'qualifications',
+      'we are looking for', 'about the role', 'what you will do',
+      'key skills', 'experience required', 'apply now', 'job description',
+    ];
+    return keywords.filter(k => text.includes(k)).length >= 2;
+  }
+
   function isJobPage() {
-    const host = window.location.hostname;
-    if (host.includes('seek.com.au')) {
-      // Direct job URL (/job/12345678) or split-panel search results (?jobId=...)
-      return /\/job\//.test(window.location.pathname) ||
-             !!new URLSearchParams(window.location.search).get('jobId');
-    }
-    if (host.includes('linkedin.com')) {
-      return !!new URLSearchParams(window.location.search).get('currentJobId');
-    }
-    return false;
+    const { hostname, pathname, search } = window.location;
+    const params = new URLSearchParams(search);
+
+    if (hostname.includes('seek.com.au'))
+      return /\/job\//.test(pathname) || !!params.get('jobId');
+
+    if (hostname.includes('linkedin.com'))
+      return !!params.get('currentJobId');
+
+    if (hostname.includes('indeed.com'))
+      return !!params.get('jk') || /\/viewjob/.test(pathname);
+
+    if (hostname.includes('glassdoor.com'))
+      return /\/job-listing\//.test(pathname) || /\/Job\//.test(pathname) || /\/jobs\//.test(pathname);
+
+    if (hostname.includes('otta.com'))
+      return /\/jobs\//.test(pathname);
+
+    if (hostname.includes('hatch.team'))
+      return /\/jobs\//.test(pathname) || /\/role\//.test(pathname);
+
+    if (hostname.includes('prosple.com'))
+      return /\/graduate-jobs\//.test(pathname) || /\/internships\//.test(pathname) || /\/jobs\//.test(pathname);
+
+    // Generic fallback for any other site in the manifest
+    return isGenericJobPage();
   }
 
   function removeStaleUI() {
@@ -402,9 +464,14 @@
 
   // Decide auto vs manual based on stored setting
   function waitAndRun() {
-    if (!isJobPage()) return;
-
     chrome.storage.local.get('autoMode', ({ autoMode }) => {
+      if (!isJobPage()) {
+        // Page not recognised as a job listing — always show manual button
+        // so the user can still trigger analysis themselves
+        buildTriggerButton();
+        return;
+      }
+
       const doRun = autoMode === true ? run : buildTriggerButton;
 
       if (extractJD()) {
@@ -412,6 +479,7 @@
         return;
       }
 
+      // JD not in DOM yet — wait for it (SPA lazy-load)
       let attempts = 0;
       const observer = new MutationObserver(() => {
         attempts++;
