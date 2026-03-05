@@ -1,11 +1,18 @@
 'use strict';
 
-const PROFILE_KEYS = ['apiKey', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
+const PROFILE_KEYS = ['apiKey', 'apiProvider', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
-function geminiApiUrl(apiKey) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-}
+// ── Provider config ───────────────────────────────────────────────────────────
+
+// OpenAI-compatible providers: base URL, model, whether the endpoint supports
+// response_format: { type: 'json_object' }
+const OPENAI_COMPAT = {
+  openai:   { base: 'https://api.openai.com',                         model: 'gpt-4o-mini',       jsonMode: true  },
+  deepseek: { base: 'https://api.deepseek.com',                       model: 'deepseek-chat',     jsonMode: true  },
+  qwen:     { base: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus',         jsonMode: true  },
+  kimi:     { base: 'https://api.moonshot.cn',                        model: 'moonshot-v1-8k',    jsonMode: false },
+};
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
@@ -39,24 +46,31 @@ visa_ok=false only when the JD explicitly restricts to citizens/PR/clearance and
 reason.pros = 1–3 concrete match strengths (omit if none). reason.cons = 1–3 concrete gaps (omit if none). One concise sentence each.`;
 }
 
-// ── Gemini API call ───────────────────────────────────────────────────────────
+// ── JSON helper ───────────────────────────────────────────────────────────────
 
-async function callLLM(apiKey, systemPrompt, jdText) {
+function safeParseJSON(raw) {
+  // Strip markdown code fences that some models add despite instructions
+  const cleaned = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  return JSON.parse(cleaned);
+}
+
+// ── Gemini ────────────────────────────────────────────────────────────────────
+
+function geminiApiUrl(apiKey) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+}
+
+async function callGemini(apiKey, systemPrompt, jdText) {
   const response = await fetch(geminiApiUrl(apiKey), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `JD:\n${jdText}` }],
-        },
-      ],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: `JD:\n${jdText}` }] }],
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -64,20 +78,88 @@ async function callLLM(apiKey, systemPrompt, jdText) {
       },
     }),
   });
-
   if (!response.ok) {
-    const errBody = await response.text().catch(() => '');
-    throw new Error(`Gemini API request failed (${response.status}): ${errBody.slice(0, 200)}`);
+    const err = await response.text().catch(() => '');
+    throw new Error(`Gemini API error (${response.status}): ${err.slice(0, 200)}`);
   }
-
   const data = await response.json();
-  const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawContent) throw new Error('Empty response from Gemini');
-
-  return JSON.parse(rawContent);
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error('Empty response from Gemini');
+  return safeParseJSON(raw);
 }
 
-// ── Resume parser ─────────────────────────────────────────────────────────────
+// ── OpenAI-compatible (OpenAI / DeepSeek / Qwen / Kimi) ──────────────────────
+
+async function callOpenAICompat(apiKey, provider, systemPrompt, jdText) {
+  const cfg = OPENAI_COMPAT[provider];
+  if (!cfg) throw new Error(`Unknown provider: ${provider}`);
+
+  const body = {
+    model: cfg.model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: `JD:\n${jdText}` },
+    ],
+    temperature: 0.1,
+    max_tokens: 450,
+  };
+  if (cfg.jsonMode) body.response_format = { type: 'json_object' };
+
+  const response = await fetch(`${cfg.base}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.text().catch(() => '');
+    throw new Error(`${provider} API error (${response.status}): ${err.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  const raw = data?.choices?.[0]?.message?.content;
+  if (!raw) throw new Error(`Empty response from ${provider}`);
+  return safeParseJSON(raw);
+}
+
+// ── Claude (Anthropic) ────────────────────────────────────────────────────────
+
+async function callClaude(apiKey, systemPrompt, jdText) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 450,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: `JD:\n${jdText}` }],
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text().catch(() => '');
+    throw new Error(`Claude API error (${response.status}): ${err.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  const raw = data?.content?.[0]?.text;
+  if (!raw) throw new Error('Empty response from Claude');
+  return safeParseJSON(raw);
+}
+
+// ── Provider router ───────────────────────────────────────────────────────────
+
+async function callLLM(provider, apiKey, systemPrompt, jdText) {
+  const p = provider || 'gemini';
+  if (p === 'gemini')  return callGemini(apiKey, systemPrompt, jdText);
+  if (p === 'claude')  return callClaude(apiKey, systemPrompt, jdText);
+  return callOpenAICompat(apiKey, p, systemPrompt, jdText);
+}
+
+// ── Resume parser (Gemini multimodal only) ────────────────────────────────────
 
 async function parseResumePDF(apiKey, base64) {
   const response = await fetch(geminiApiUrl(apiKey), {
@@ -87,16 +169,9 @@ async function parseResumePDF(apiKey, base64) {
       contents: [{
         role: 'user',
         parts: [
-          {
-            inlineData: {
-              mimeType: 'application/pdf',
-              data: base64,
-            },
-          },
-          {
-            text: `Extract the candidate's profile from this resume. Output strict JSON only (no Markdown):
-{"education":"degree and university","visaStatus":"visa type and work rights if mentioned, else empty string","targetRole":"most recent or target job title","skills":"comma-separated key technical skills","experience":"years of experience or level e.g. 0-1 year / 2-3 years","workHistory":"brief summary of work roles and notable projects, max 3 sentences"}`,
-          },
+          { inlineData: { mimeType: 'application/pdf', data: base64 } },
+          { text: `Extract the candidate's profile from this resume. Output strict JSON only (no Markdown):
+{"education":"degree and university","visaStatus":"visa type and work rights if mentioned, else empty string","targetRole":"most recent or target job title","skills":"comma-separated key technical skills","experience":"years of experience or level e.g. 0-1 year / 2-3 years","workHistory":"brief summary of work roles and notable projects, max 3 sentences"}` },
         ],
       }],
       generationConfig: {
@@ -106,23 +181,20 @@ async function parseResumePDF(apiKey, base64) {
       },
     }),
   });
-
   if (!response.ok) {
-    const errBody = await response.text().catch(() => '');
-    throw new Error(`Gemini API request failed (${response.status}): ${errBody.slice(0, 200)}`);
+    const err = await response.text().catch(() => '');
+    throw new Error(`Gemini API error (${response.status}): ${err.slice(0, 200)}`);
   }
-
   const data = await response.json();
-  const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawContent) throw new Error('Empty response from Gemini');
-
-  return JSON.parse(rawContent);
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error('Empty response from Gemini');
+  return safeParseJSON(raw);
 }
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  // ── Parse resume ──
+  // ── Parse resume (Gemini only) ──
   if (message.action === 'parse_resume') {
     if (!message.base64) {
       sendResponse({ error: 'No PDF data received.' });
@@ -150,20 +222,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   (async () => {
     try {
-      const profile = await new Promise((resolve, reject) => {
+      const stored = await new Promise((resolve, reject) => {
         chrome.storage.local.get(PROFILE_KEYS, (data) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else resolve(data);
         });
       });
 
-      if (!profile.apiKey) {
+      if (!stored.apiKey) {
         sendResponse({ error: 'Please add your API Key in the extension settings.' });
         return;
       }
 
-      const systemPrompt = buildSystemPrompt(profile);
-      const result = await callLLM(profile.apiKey, systemPrompt, jdText);
+      const systemPrompt = buildSystemPrompt(stored);
+      const result = await callLLM(stored.apiProvider, stored.apiKey, systemPrompt, jdText);
 
       if (!result.status || !['PASS', 'WARNING', 'FAIL'].includes(result.status)) {
         throw new Error('Invalid status value returned by the model.');

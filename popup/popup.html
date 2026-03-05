@@ -26,7 +26,19 @@
       </div>
 
       <div class="field">
-        <label for="apiKey">Gemini API Key</label>
+        <label for="apiProvider">Provider</label>
+        <select id="apiProvider" name="apiProvider">
+          <option value="gemini">Gemini ✦ Recommended (free tier)</option>
+          <option value="openai">OpenAI (GPT-4o mini)</option>
+          <option value="claude">Claude (Anthropic · Haiku)</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="qwen">Qwen (Alibaba)</option>
+          <option value="kimi">Kimi (Moonshot)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="apiKey" id="apiKeyLabel">API Key</label>
         <div class="input-wrapper">
           <input
             type="password"
@@ -42,7 +54,7 @@
             </svg>
           </button>
         </div>
-        <p class="field-hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></p>
+        <p class="field-hint" id="apiKeyHint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></p>
       </div>
 
       <!-- Step 2: Resume upload (reads key from input above, no save needed) -->
@@ -63,6 +75,9 @@
         </label>
         <input type="file" id="resumeFile" accept=".pdf" style="display:none" />
         <div id="parseStatus" class="parse-status"></div>
+        <p class="field-hint" id="resumeProviderNote" style="display:none">
+          ⚠ PDF parsing uses Gemini. Switch provider to Gemini to use this feature.
+        </p>
       </div>
 
       <!-- Step 3: Profile fields -->

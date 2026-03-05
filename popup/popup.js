@@ -1,4 +1,14 @@
-const FIELDS = ['apiKey', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
+const FIELDS = ['apiKey', 'apiProvider', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
+
+// Per-provider UI metadata
+const PROVIDER_META = {
+  gemini:   { label: 'Gemini API Key',    placeholder: 'AIza...',      hint: 'Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>' },
+  openai:   { label: 'OpenAI API Key',    placeholder: 'sk-...',        hint: 'Get a key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>' },
+  claude:   { label: 'Anthropic API Key', placeholder: 'sk-ant-...',    hint: 'Get a key at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>' },
+  deepseek: { label: 'DeepSeek API Key',  placeholder: 'sk-...',        hint: 'Get a key at <a href="https://platform.deepseek.com/" target="_blank">platform.deepseek.com</a>' },
+  qwen:     { label: 'DashScope API Key', placeholder: 'sk-...',        hint: 'Get a key at <a href="https://dashscope.console.aliyun.com/" target="_blank">dashscope.console.aliyun.com</a>' },
+  kimi:     { label: 'Moonshot API Key',  placeholder: 'sk-...',        hint: 'Get a key at <a href="https://platform.moonshot.cn/" target="_blank">platform.moonshot.cn</a>' },
+};
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 
@@ -8,6 +18,30 @@ function showToast(message, isError = false) {
   toast.classList.toggle('error', isError);
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ── Provider UI ────────────────────────────────────────────────────────────────
+
+function updateProviderUI(provider) {
+  const meta = PROVIDER_META[provider] || PROVIDER_META.gemini;
+  document.getElementById('apiKeyLabel').textContent = meta.label;
+  document.getElementById('apiKey').placeholder = meta.placeholder;
+  document.getElementById('apiKeyHint').innerHTML = meta.hint;
+
+  // PDF parsing only works with Gemini
+  const note = document.getElementById('resumeProviderNote');
+  const uploadBtn = document.querySelector('.btn-upload');
+  if (provider && provider !== 'gemini') {
+    note.style.display = 'block';
+    uploadBtn.style.opacity = '0.45';
+    uploadBtn.style.pointerEvents = 'none';
+    uploadBtn.title = 'PDF parsing requires Gemini';
+  } else {
+    note.style.display = 'none';
+    uploadBtn.style.opacity = '';
+    uploadBtn.style.pointerEvents = '';
+    uploadBtn.title = '';
+  }
 }
 
 // ── Mode toggle ────────────────────────────────────────────────────────────────
@@ -31,6 +65,11 @@ function loadProfile() {
       const el = document.getElementById(key);
       if (el && data[key]) el.value = data[key];
     });
+
+    // Apply provider-specific UI after values are loaded
+    const provider = data.apiProvider || 'gemini';
+    document.getElementById('apiProvider').value = provider;
+    updateProviderUI(provider);
 
     const isAuto = data.autoMode === true;
     document.getElementById('autoModeToggle').checked = isAuto;
@@ -101,6 +140,12 @@ function handleResumeUpload(file) {
   if (!file) return;
   if (file.type !== 'application/pdf') {
     showToast('Please select a PDF file', true);
+    return;
+  }
+
+  const provider = document.getElementById('apiProvider').value || 'gemini';
+  if (provider !== 'gemini') {
+    setParseStatus('error', 'PDF parsing requires Gemini. Switch provider to Gemini.');
     return;
   }
 
@@ -186,4 +231,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupModeToggle();
   setupResumeUpload();
   document.getElementById('profileForm').addEventListener('submit', saveProfile);
+
+  // Update key label/placeholder/hint live when provider changes
+  document.getElementById('apiProvider').addEventListener('change', (e) => {
+    updateProviderUI(e.target.value);
+  });
 });
