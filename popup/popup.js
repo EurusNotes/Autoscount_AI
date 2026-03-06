@@ -1,4 +1,4 @@
-const FIELDS = ['apiKey', 'apiProvider', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
+const FIELDS = ['apiKey', 'apiProvider', 'outputLanguage', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
 
 // Per-provider UI metadata
 const PROVIDER_META = {
@@ -86,6 +86,16 @@ function setKeyStatus(state, text) {
   el.textContent = text;
 }
 
+function persistProfile(profile) {
+  chrome.storage.local.set(profile, () => {
+    if (chrome.runtime.lastError) {
+      showToast('Save failed, please try again', true);
+    } else {
+      showToast('✓ Profile saved');
+    }
+  });
+}
+
 function saveProfile(e) {
   e.preventDefault();
 
@@ -101,35 +111,41 @@ function saveProfile(e) {
     return;
   }
 
-  const saveBtn = document.getElementById('saveBtn');
-  const originalHTML = saveBtn.innerHTML;
-  saveBtn.disabled = true;
-  saveBtn.innerHTML = `<div class="parse-spinner"></div> Validating…`;
-  setKeyStatus('validating', 'Checking…');
-
-  chrome.runtime.sendMessage(
-    { action: 'validate_key', provider: profile.apiProvider || 'gemini', apiKey: profile.apiKey },
-    (response) => {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = originalHTML;
-
-      if (chrome.runtime.lastError || !response?.valid) {
-        const msg = response?.error || chrome.runtime.lastError?.message || 'Validation failed';
-        setKeyStatus('invalid', '✗ Invalid');
-        showToast(msg, true);
-        return;
-      }
-
+  // If the key hasn't changed from what's already stored, skip validation
+  // and save immediately — this prevents profile updates from being blocked
+  // by a transient API error on the validation call.
+  chrome.storage.local.get('apiKey', ({ apiKey: storedKey }) => {
+    if (storedKey && storedKey === profile.apiKey) {
       setKeyStatus('valid', '✓ Valid');
-      chrome.storage.local.set(profile, () => {
-        if (chrome.runtime.lastError) {
-          showToast('Save failed, please try again', true);
-        } else {
-          showToast('✓ Profile saved');
-        }
-      });
+      persistProfile(profile);
+      return;
     }
-  );
+
+    // Key is new or changed — validate before saving
+    const saveBtn = document.getElementById('saveBtn');
+    const originalHTML = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `<div class="parse-spinner"></div> Validating…`;
+    setKeyStatus('validating', 'Checking…');
+
+    chrome.runtime.sendMessage(
+      { action: 'validate_key', provider: profile.apiProvider || 'gemini', apiKey: profile.apiKey },
+      (response) => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHTML;
+
+        if (chrome.runtime.lastError || !response?.valid) {
+          const msg = response?.error || chrome.runtime.lastError?.message || 'Validation failed';
+          setKeyStatus('invalid', '✗ Invalid');
+          showToast(msg, true);
+          return;
+        }
+
+        setKeyStatus('valid', '✓ Valid');
+        persistProfile(profile);
+      }
+    );
+  });
 }
 
 // ── Resume PDF parsing ─────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use strict';
 
-const PROFILE_KEYS = ['apiKey', 'apiProvider', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
+const PROFILE_KEYS = ['apiKey', 'apiProvider', 'outputLanguage', 'education', 'visaStatus', 'targetRole', 'skills', 'experience', 'workHistory'];
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 // ── Provider config ───────────────────────────────────────────────────────────
@@ -13,6 +13,9 @@ const OPENAI_COMPAT = {
   qwen:     { base: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus',         jsonMode: true  },
   kimi:     { base: 'https://api.moonshot.cn',                        model: 'moonshot-v1-8k',    jsonMode: false },
 };
+
+// Language name map for prompt injection
+const LANG_NAMES = { zh: 'Chinese (Simplified)', hi: 'Hindi', ja: 'Japanese' };
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
@@ -41,9 +44,9 @@ RESTRICTED roles — set visa_ok=false if JD requires any of:
   - "Baseline/NV1/NV2/PV security clearance" (requires citizenship)
 
 Hard-fail rules (set status=FAIL): visa is restricted AND candidate does not qualify; OR JD requires "Senior", "Lead", or "5+ years" and candidate experience is clearly insufficient.
-Output strict JSON (no Markdown): {"status":"PASS|WARNING|FAIL","match_score":0-100,"role_score":0-100,"skills_score":0-100,"experience_score":0-100,"visa_ok":true|false,"visa_check":"one sentence explaining the visa assessment","experience_check":"...","reason":{"pros":["strength 1"],"cons":["gap 1"]}}
+Output strict JSON (no Markdown): {"job_title":"exact job title from JD","status":"PASS|WARNING|FAIL","match_score":0-100,"role_score":0-100,"skills_score":0-100,"experience_score":0-100,"visa_ok":true|false,"visa_check":"one sentence","experience_check":"one sentence","reason":{"pros":["strength 1"],"cons":["gap 1"]}}
 visa_ok=false only when the JD explicitly restricts to citizens/PR/clearance and the candidate visa does not qualify. If JD says "full work rights" and candidate holds 485 or PR, visa_ok=true.
-reason.pros = 1–3 concrete match strengths (omit if none). reason.cons = 1–3 concrete gaps (omit if none). One concise sentence each.`;
+reason.pros = up to 2 concrete match strengths (omit if none). reason.cons = up to 2 concrete gaps (omit if none). Each item must be 8 words or fewer.${profile.outputLanguage && profile.outputLanguage !== 'en' ? `\nAll text values in the JSON (job_title, visa_check, experience_check, reason.pros, reason.cons) must be written in: ${LANG_NAMES[profile.outputLanguage] || profile.outputLanguage}.` : ''}`;
 }
 
 // ── JSON helper ───────────────────────────────────────────────────────────────
@@ -103,7 +106,7 @@ async function callGemini(apiKey, systemPrompt, jdText) {
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
-        maxOutputTokens: 450,
+        maxOutputTokens: 512,
       },
     }),
   });
@@ -130,7 +133,7 @@ async function callOpenAICompat(apiKey, provider, systemPrompt, jdText) {
       { role: 'user',   content: `JD:\n${jdText}` },
     ],
     temperature: 0.1,
-    max_tokens: 450,
+    max_tokens: 512,
   };
   if (cfg.jsonMode) body.response_format = { type: 'json_object' };
 
@@ -164,7 +167,7 @@ async function callClaude(apiKey, systemPrompt, jdText) {
     },
     body: JSON.stringify({
       model: 'claude-3-5-haiku-20241022',
-      max_tokens: 450,
+      max_tokens: 512,
       system: systemPrompt,
       messages: [{ role: 'user', content: `JD:\n${jdText}` }],
     }),

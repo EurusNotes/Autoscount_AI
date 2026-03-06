@@ -100,6 +100,94 @@
     return cleanText(text);
   }
 
+  // ── Localised strings ──────────────────────────────────────────────────────
+
+  const STRINGS = {
+    en: {
+      analyzing:    'Analyzing…',
+      slow:         'Taking longer than usual, please wait…',
+      analyzeBtn:   'Analyze this job',
+      analyzingBtn: 'Analyzing…',
+      strengths:    'Strengths',
+      concerns:     'Concerns',
+      noDetails:    'No details provided.',
+      visaOk:       'Open to Visa Holders',
+      visaFail:     'Requires PR / Citizen',
+      visaLabel:    'Visa',
+      roleLabel:    'Role',
+      skillsLabel:  'Skills',
+      expLabel:     'Exp',
+      pass:         'Strong Match',
+      warning:      'Consider Carefully',
+      fail:         'Not a Good Fit',
+      errReload:    'Extension was reloaded — please refresh this page.',
+      errNoResp:    'No valid response received.',
+    },
+    zh: {
+      analyzing:    '分析中…',
+      slow:         '分析时间较长，请稍候…',
+      analyzeBtn:   '分析此职位',
+      analyzingBtn: '分析中…',
+      strengths:    '优势',
+      concerns:     '顾虑',
+      noDetails:    '暂无详细分析。',
+      visaOk:       '接受签证申请者',
+      visaFail:     '仅限PR/公民',
+      visaLabel:    '签证',
+      roleLabel:    '职位',
+      skillsLabel:  '技能',
+      expLabel:     '经验',
+      pass:         '强烈推荐',
+      warning:      '谨慎考虑',
+      fail:         '不太匹配',
+      errReload:    '扩展已重载，请刷新此页面。',
+      errNoResp:    '未收到有效响应。',
+    },
+    hi: {
+      analyzing:    'विश्लेषण हो रहा है…',
+      slow:         'सामान्य से अधिक समय लग रहा है, कृपया प्रतीक्षा करें…',
+      analyzeBtn:   'इस जॉब का विश्लेषण करें',
+      analyzingBtn: 'विश्लेषण हो रहा है…',
+      strengths:    'ताकत',
+      concerns:     'कमियाँ',
+      noDetails:    'कोई विवरण नहीं।',
+      visaOk:       'वीज़ा धारकों के लिए खुला',
+      visaFail:     'PR/नागरिक आवश्यक',
+      visaLabel:    'वीज़ा',
+      roleLabel:    'भूमिका',
+      skillsLabel:  'कौशल',
+      expLabel:     'अनुभव',
+      pass:         'बेहतरीन मिलान',
+      warning:      'सावधानी से सोचें',
+      fail:         'उपयुक्त नहीं',
+      errReload:    'एक्सटेंशन पुनः लोड हुई — कृपया पृष्ठ ताज़ा करें।',
+      errNoResp:    'कोई मान्य प्रतिक्रिया नहीं मिली।',
+    },
+    ja: {
+      analyzing:    '分析中…',
+      slow:         '通常より時間がかかっています。しばらくお待ちください…',
+      analyzeBtn:   'この求人を分析する',
+      analyzingBtn: '分析中…',
+      strengths:    '強み',
+      concerns:     '懸念点',
+      noDetails:    '詳細なし。',
+      visaOk:       'ビザ保持者可',
+      visaFail:     'PR/市民権が必要',
+      visaLabel:    'ビザ',
+      roleLabel:    '職種',
+      skillsLabel:  'スキル',
+      expLabel:     '経験',
+      pass:         '強くマッチ',
+      warning:      '慎重に検討',
+      fail:         '不適合',
+      errReload:    '拡張機能が再読み込みされました — ページを更新してください。',
+      errNoResp:    '有効な応答がありませんでした。',
+    },
+  };
+
+  // Active strings — updated from storage before each run
+  let S = STRINGS.en;
+
   // ── Card construction ──────────────────────────────────────────────────────
 
   function buildCard(title) {
@@ -131,10 +219,10 @@
       <div class="as-body">
         <div class="as-loading">
           <div class="as-spinner"></div>
-          <span>Analyzing...</span>
+          <span>${S.analyzing}</span>
           <span class="as-loading-timer">0s</span>
         </div>
-        <p class="as-loading-slow" style="display:none">Taking longer than usual, please wait…</p>
+        <p class="as-loading-slow" style="display:none">${S.slow}</p>
       </div>
     `;
     document.body.appendChild(card);
@@ -201,40 +289,37 @@
 
   // ── Result rendering ───────────────────────────────────────────────────────
 
-  const STATUS_LABELS = {
-    PASS: 'Apply Now',
-    WARNING: 'Consider Carefully',
-    FAIL: 'Not Recommended',
-  };
+  function getStatusLabel(status) {
+    return { PASS: S.pass, WARNING: S.warning, FAIL: S.fail }[status] ?? status;
+  }
 
   function buildReasonHtml(reason) {
     let pros = [];
     let cons = [];
 
     if (reason && typeof reason === 'object' && !Array.isArray(reason)) {
-      pros = Array.isArray(reason.pros) ? reason.pros.slice(0, 3) : [];
-      cons = Array.isArray(reason.cons) ? reason.cons.slice(0, 3) : [];
+      pros = Array.isArray(reason.pros) ? reason.pros.slice(0, 2) : [];
+      cons = Array.isArray(reason.cons) ? reason.cons.slice(0, 2) : [];
     } else if (Array.isArray(reason)) {
-      // Legacy fallback: treat all items as cons
-      cons = reason.slice(0, 4);
+      cons = reason.slice(0, 2);
     } else if (typeof reason === 'string' && reason) {
       cons = [reason];
     }
 
     if (!pros.length && !cons.length) {
-      return `<div class="as-reason-box as-reason-neutral"><p>No details provided.</p></div>`;
+      return `<div class="as-reason-box as-reason-neutral"><p>${S.noDetails}</p></div>`;
     }
 
     const prosHtml = pros.length
       ? `<div class="as-reason-box as-reason-pros">
-           <span class="as-reason-box-label">Strengths</span>
+           <span class="as-reason-box-label">${S.strengths}</span>
            <ul>${pros.map(s => `<li>${s}</li>`).join('')}</ul>
          </div>`
       : '';
 
     const consHtml = cons.length
       ? `<div class="as-reason-box as-reason-cons">
-           <span class="as-reason-box-label">Concerns</span>
+           <span class="as-reason-box-label">${S.concerns}</span>
            <ul>${cons.map(s => `<li>${s}</li>`).join('')}</ul>
          </div>`
       : '';
@@ -251,16 +336,28 @@
 
     card.classList.add(statusClass);
 
-    const label = STATUS_LABELS[result.status] ?? result.status;
+    // Update job title in the header: prefer LLM-extracted title over DOM title
+    if (result.job_title) {
+      let titleEl = card.querySelector('.as-job-title');
+      if (!titleEl) {
+        titleEl = document.createElement('div');
+        titleEl.className = 'as-job-title';
+        card.querySelector('.as-header').appendChild(titleEl);
+      }
+      const t = result.job_title;
+      titleEl.textContent = t.length > 55 ? t.slice(0, 52) + '…' : t;
+    }
+
+    const label = getStatusLabel(result.status);
     const score = Math.min(100, Math.max(0, Number(result.match_score) || 0));
 
     const roleScore   = Math.min(100, Math.max(0, Number(result.role_score)   || 0));
     const skillsScore = Math.min(100, Math.max(0, Number(result.skills_score) || 0));
     const expScore    = Math.min(100, Math.max(0, Number(result.experience_score) || 0));
 
-    const visaOk = result.visa_ok !== false; // default true if field missing
+    const visaOk = result.visa_ok !== false;
     const visaTileClass = visaOk ? 'visa-ok' : 'visa-fail';
-    const visaLabel     = visaOk ? 'Open to Visa Holders' : 'Requires PR / Citizen';
+    const visaLabel     = visaOk ? S.visaOk : S.visaFail;
     const visaBadge     = visaOk ? '✓' : '✗';
 
     card.querySelector('.as-body').innerHTML = `
@@ -278,17 +375,17 @@
 
       <div class="as-bento-scores">
         <div class="as-bento-tile">
-          <span class="as-tile-label">Role</span>
+          <span class="as-tile-label">${S.roleLabel}</span>
           <span class="as-tile-num">${roleScore}</span>
           <div class="as-tile-bar-track"><div class="as-tile-bar-fill" data-val="${roleScore}" style="width:0%"></div></div>
         </div>
         <div class="as-bento-tile">
-          <span class="as-tile-label">Skills</span>
+          <span class="as-tile-label">${S.skillsLabel}</span>
           <span class="as-tile-num">${skillsScore}</span>
           <div class="as-tile-bar-track"><div class="as-tile-bar-fill" data-val="${skillsScore}" style="width:0%"></div></div>
         </div>
         <div class="as-bento-tile">
-          <span class="as-tile-label">Exp</span>
+          <span class="as-tile-label">${S.expLabel}</span>
           <span class="as-tile-num">${expScore}</span>
           <div class="as-tile-bar-track"><div class="as-tile-bar-fill" data-val="${expScore}" style="width:0%"></div></div>
         </div>
@@ -297,7 +394,7 @@
       <div class="as-visa-tile ${visaTileClass}">
         <div class="as-visa-tile-row">
           <div class="as-visa-tile-left">
-            <span class="as-tile-label">Visa</span>
+            <span class="as-tile-label">${S.visaLabel}</span>
             <span class="as-visa-status-text">${visaLabel}</span>
             ${result.visa_check ? `<span class="as-visa-detail">${result.visa_check}</span>` : ''}
           </div>
@@ -345,7 +442,7 @@
     btn.style.cursor = 'pointer';
     btn.style.display = 'flex';
     const label = btn.querySelector('span');
-    if (label) label.textContent = 'Analyze this job';
+    if (label) label.textContent = S.analyzeBtn;
   }
 
   // ── Manual mode: floating trigger button ───────────────────────────────────
@@ -361,7 +458,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <span>Analyze this job</span>
+      <span>${S.analyzeBtn}</span>
     `;
     Object.assign(btn.style, {
       position: 'fixed',
@@ -391,7 +488,7 @@
       btn.style.opacity = '0.6';
       btn.style.cursor = 'default';
       const label = btn.querySelector('span');
-      if (label) label.textContent = 'Analyzing…';
+      if (label) label.textContent = S.analyzingBtn;
       run();
     });
     document.body.appendChild(btn);
@@ -425,7 +522,7 @@
 
     if (!isExtensionAlive()) {
       stopTimer();
-      renderError(card, 'Extension was reloaded — please refresh this page.');
+      renderError(card, S.errReload);
       restoreTriggerButton();
       return;
     }
@@ -437,8 +534,8 @@
         try {
           if (!isExtensionAlive() || chrome.runtime.lastError) {
             const msg = isExtensionAlive()
-              ? (chrome.runtime.lastError?.message || 'Extension communication error')
-              : 'Extension was reloaded — please refresh this page.';
+              ? (chrome.runtime.lastError?.message || S.errReload)
+              : S.errReload;
             renderError(card, msg);
             restoreTriggerButton();
             return;
@@ -451,17 +548,17 @@
           if (response?.result) {
             renderResult(card, response.result);
           } else {
-            renderError(card, 'No valid response received.');
+            renderError(card, S.errNoResp);
           }
           restoreTriggerButton();
         } catch (_) {
-          renderError(card, 'Extension was reloaded — please refresh this page.');
+          renderError(card, S.errReload);
           restoreTriggerButton();
         }
       });
     } catch (_) {
       stopTimer();
-      renderError(card, 'Extension was reloaded — please refresh this page.');
+      renderError(card, S.errReload);
       restoreTriggerButton();
     }
   }
@@ -571,7 +668,10 @@
   function waitAndRun() {
     if (!isExtensionAlive()) return;
     try {
-    chrome.storage.local.get('autoMode', ({ autoMode }) => {
+    chrome.storage.local.get(['autoMode', 'outputLanguage'], ({ autoMode, outputLanguage }) => {
+      // Load localised strings before any UI is built
+      S = STRINGS[outputLanguage] || STRINGS.en;
+
       if (!isJobPage()) {
         // Page not recognised as a job listing — always show manual button
         // so the user can still trigger analysis themselves
