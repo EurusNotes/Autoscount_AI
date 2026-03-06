@@ -52,20 +52,71 @@
 
 ## Installation
 
-### Option A — Chrome Web Store *(recommended)*
+### Option A — Chrome Web Store *(coming soon — currently under review)*
 
-Search for **AutoScout AI** on the [Chrome Web Store](https://chrome.google.com/webstore) and click **Add to Chrome**.
+Once approved, you will be able to search for **AutoScout AI** on the Chrome Web Store and click **Add to Chrome** — no technical steps required. Check back soon.
 
-### Option B — Load unpacked (developer mode)
+---
 
-1. Download or clone this repository
-2. Open Chrome and go to `chrome://extensions`
-3. Enable **Developer mode** (toggle in the top-right corner)
-4. Click **Load unpacked**
-5. Select the `autoscout-ai` folder
-6. The AutoScout AI icon appears in your toolbar
+### Option B — Manual install (available now)
 
-> After reloading or updating the extension, refresh any open job tabs before using it.
+This method takes about 3 minutes and does not require any coding knowledge.
+
+#### 1. Download the extension files
+
+1. Go to the GitHub releases page:  
+   **[github.com/EurusNotes/Autoscount_AI](https://github.com/EurusNotes/Autoscount_AI)**
+2. Click the green **`<> Code`** button near the top-right of the page
+3. Click **`Download ZIP`**
+4. A file called `Autoscount_AI-main.zip` will be downloaded to your computer (usually in your `Downloads` folder)
+
+#### 2. Unzip the downloaded file
+
+- **Windows**: Right-click the ZIP file → **Extract All** → click **Extract**
+- **Mac**: Double-click the ZIP file — it extracts automatically
+
+You will now have a folder called `Autoscount_AI-main`. Open it and look inside — you should see another folder called **`autoscout-ai`**. This inner folder is the one you need.
+
+#### 3. Open Chrome's extension page
+
+1. Open **Google Chrome** (this extension does not work on Safari, Firefox, or Edge)
+2. In the address bar at the top, type the following and press Enter:
+   ```
+   chrome://extensions
+   ```
+3. You will see a page titled **"Extensions"**
+
+#### 4. Enable Developer Mode
+
+1. Look at the **top-right corner** of the Extensions page
+2. You will see a toggle switch labelled **"Developer mode"**
+3. Click it to turn it **ON** — the toggle should turn blue
+4. Three new buttons will appear at the top-left: **Load unpacked**, Pack extension, and Update
+
+#### 5. Load the extension
+
+1. Click **"Load unpacked"** (the leftmost of the three new buttons)
+2. A file picker window opens
+3. Navigate to the `Autoscount_AI-main` folder you unzipped in Step 2
+4. Open it and select the **`autoscout-ai`** inner folder (the one that contains `manifest.json`)
+5. Click **Select** (Mac) or **Select Folder** (Windows)
+
+> **How do I know I selected the right folder?**  
+> The correct folder contains a file called `manifest.json`. If you open it in a text editor it starts with `"manifest_version": 3`.
+
+#### 6. Confirm the extension is installed
+
+1. The Extensions page should now show a card for **AutoScout AI**
+2. Go to your Chrome toolbar (top-right of the browser)
+3. Click the **puzzle piece icon** 🧩
+4. Find **AutoScout AI** in the list and click the **pin icon** 📌 next to it
+5. The AutoScout AI icon now appears permanently in your toolbar
+
+> **Important:** After installing, refresh any job-listing tabs that were already open before the extension was installed.
+
+#### Updating the extension in future
+
+When a new version is released on GitHub, repeat Steps 1–5 using the new ZIP. After loading the new folder, click the **circular refresh icon** on the AutoScout AI card on the Extensions page, then refresh any open job tabs.
 
 ---
 
