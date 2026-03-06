@@ -49,13 +49,42 @@ reason.pros = 1–3 concrete match strengths (omit if none). reason.cons = 1–3
 // ── JSON helper ───────────────────────────────────────────────────────────────
 
 function safeParseJSON(raw) {
-  // Strip markdown code fences that some models add despite instructions
   const cleaned = raw
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
   return JSON.parse(cleaned);
+}
+
+// ── API error classifier ──────────────────────────────────────────────────────
+
+function classifyApiError(status, bodyText, provider) {
+  const name = provider || 'API';
+  if (!status) {
+    return 'Network error — check your internet connection and try again.';
+  }
+  switch (status) {
+    case 400:
+      return `${name}: Bad request — the request format may be unsupported. Try a different provider.`;
+    case 401:
+    case 403:
+      return `${name}: Invalid API key. Please check your key and save again.`;
+    case 404:
+      return `${name}: Model not found. The provider may have retired this model — contact support.`;
+    case 429:
+      return `${name}: Rate limit or quota exceeded. Wait a minute, or check your usage dashboard.`;
+    case 500:
+    case 502:
+    case 503:
+      return `${name}: Server error (${status}). The provider is having issues — try again shortly.`;
+    default: {
+      // Try to extract a message from the response body
+      const match = bodyText?.match(/"message"\s*:\s*"([^"]{0,120})"/);
+      const detail = match ? ` — ${match[1]}` : '';
+      return `${name}: Request failed (${status})${detail}`;
+    }
+  }
 }
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
@@ -79,8 +108,8 @@ async function callGemini(apiKey, systemPrompt, jdText) {
     }),
   });
   if (!response.ok) {
-    const err = await response.text().catch(() => '');
-    throw new Error(`Gemini API error (${response.status}): ${err.slice(0, 200)}`);
+    const body = await response.text().catch(() => '');
+    throw new Error(classifyApiError(response.status, body, 'Gemini'));
   }
   const data = await response.json();
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -114,8 +143,8 @@ async function callOpenAICompat(apiKey, provider, systemPrompt, jdText) {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const err = await response.text().catch(() => '');
-    throw new Error(`${provider} API error (${response.status}): ${err.slice(0, 200)}`);
+    const body = await response.text().catch(() => '');
+    throw new Error(classifyApiError(response.status, body, provider));
   }
   const data = await response.json();
   const raw = data?.choices?.[0]?.message?.content;
@@ -141,13 +170,61 @@ async function callClaude(apiKey, systemPrompt, jdText) {
     }),
   });
   if (!response.ok) {
-    const err = await response.text().catch(() => '');
-    throw new Error(`Claude API error (${response.status}): ${err.slice(0, 200)}`);
+    const body = await response.text().catch(() => '');
+    throw new Error(classifyApiError(response.status, body, 'Claude'));
   }
   const data = await response.json();
   const raw = data?.content?.[0]?.text;
   if (!raw) throw new Error('Empty response from Claude');
   return safeParseJSON(raw);
+}
+
+// ── API Key validator ─────────────────────────────────────────────────────────
+// Send the cheapest possible request to confirm the key is accepted.
+
+async function validateKey(provider, apiKey) {
+  const p = provider || 'gemini';
+  let response;
+
+  try {
+    if (p === 'gemini') {
+      response = await fetch(geminiApiUrl(apiKey), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
+          generationConfig: { maxOutputTokens: 1 },
+        }),
+      });
+    } else if (p === 'claude') {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'hi' }],
+        }),
+      });
+    } else {
+      // OpenAI-compatible: list models — free auth check, no tokens consumed
+      const cfg = OPENAI_COMPAT[p];
+      if (!cfg) return { valid: false, error: `Unknown provider: ${p}` };
+      response = await fetch(`${cfg.base}/v1/models`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
+    }
+  } catch (_) {
+    return { valid: false, error: classifyApiError(null, '', p) };
+  }
+
+  if (response.ok) return { valid: true };
+  const body = await response.text().catch(() => '');
+  return { valid: false, error: classifyApiError(response.status, body, p) };
 }
 
 // ── Provider router ───────────────────────────────────────────────────────────
@@ -194,6 +271,19 @@ async function parseResumePDF(apiKey, base64) {
 // ── Message handler ───────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // ── Validate API key ──
+  if (message.action === 'validate_key') {
+    (async () => {
+      try {
+        const result = await validateKey(message.provider, message.apiKey);
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({ valid: false, error: err.message || 'Unknown error' });
+      }
+    })();
+    return true;
+  }
+
   // ── Parse resume (Gemini only) ──
   if (message.action === 'parse_resume') {
     if (!message.base64) {

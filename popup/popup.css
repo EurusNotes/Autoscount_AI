@@ -172,6 +172,40 @@ body {
   letter-spacing: 0;
 }
 
+/* Label row (label + char count side by side) */
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.field-label-row label {
+  margin-bottom: 0;
+}
+
+.char-count {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s;
+}
+
+.char-count.over { color: #dc2626; font-weight: 600; }
+
+/* API key inline status */
+.key-status {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 20px;
+  display: none;
+}
+
+.key-status.validating { display: inline; background: #f0f2f7; color: #6b7080; }
+.key-status.valid      { display: inline; background: #dcfce7; color: #166534; }
+.key-status.invalid    { display: inline; background: #fee2e2; color: #991b1b; }
+
 /* Field hint / link */
 .field-hint {
   font-size: 10.5px;
@@ -409,6 +443,12 @@ textarea:focus {
 
 .btn-save:active {
   transform: scale(0.98);
+}
+
+.btn-save:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-save svg {

@@ -132,10 +132,64 @@
         <div class="as-loading">
           <div class="as-spinner"></div>
           <span>Analyzing...</span>
+          <span class="as-loading-timer">0s</span>
         </div>
+        <p class="as-loading-slow" style="display:none">Taking longer than usual, please wait…</p>
       </div>
     `;
     document.body.appendChild(card);
+
+    // ── Restore saved position ────────────────────────────────────────────────
+    if (isExtensionAlive()) {
+      try {
+        chrome.storage.local.get('cardPos', ({ cardPos }) => {
+          if (cardPos?.top && cardPos?.left) {
+            card.style.top   = cardPos.top;
+            card.style.left  = cardPos.left;
+            card.style.right = 'auto';
+          }
+        });
+      } catch (_) {}
+    }
+
+    // ── Drag to reposition ────────────────────────────────────────────────────
+    const headerEl = card.querySelector('.as-header');
+    headerEl.style.cursor = 'grab';
+
+    headerEl.addEventListener('mousedown', (e) => {
+      // Ignore clicks on the close button
+      if (e.target.closest('.as-close')) return;
+
+      e.preventDefault();
+      headerEl.style.cursor = 'grabbing';
+
+      const rect    = card.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+
+      function onMove(e) {
+        const newLeft = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth  - card.offsetWidth));
+        const newTop  = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - card.offsetHeight));
+        card.style.left  = newLeft + 'px';
+        card.style.top   = newTop  + 'px';
+        card.style.right = 'auto';
+      }
+
+      function onUp() {
+        headerEl.style.cursor = 'grab';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup',   onUp);
+        // Persist position
+        if (isExtensionAlive()) {
+          try {
+            chrome.storage.local.set({ cardPos: { top: card.style.top, left: card.style.left } });
+          } catch (_) {}
+        }
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+    });
 
     document.getElementById('autoscout-close').addEventListener('click', () => {
       card.remove();
@@ -357,13 +411,27 @@
     const jobTitle = extractJobTitle();
     const card = buildCard(jobTitle);
 
+    // ── Elapsed-time counter ──────────────────────────────────────────────────
+    let elapsed = 0;
+    const timerEl = card.querySelector('.as-loading-timer');
+    const slowEl  = card.querySelector('.as-loading-slow');
+    const timerInterval = setInterval(() => {
+      elapsed++;
+      if (timerEl) timerEl.textContent = `${elapsed}s`;
+      if (slowEl && elapsed >= 15) slowEl.style.display = 'block';
+    }, 1000);
+
+    function stopTimer() { clearInterval(timerInterval); }
+
     if (!isExtensionAlive()) {
+      stopTimer();
       renderError(card, 'Extension was reloaded — please refresh this page.');
       restoreTriggerButton();
       return;
     }
     try {
       chrome.runtime.sendMessage({ action: 'analyze_jd', text: jdText }, (response) => {
+        stopTimer();
         // Guard inside the async callback — context may have died by the time
         // this fires, making chrome.runtime.lastError itself throw a TypeError.
         try {
@@ -392,6 +460,7 @@
         }
       });
     } catch (_) {
+      stopTimer();
       renderError(card, 'Extension was reloaded — please refresh this page.');
       restoreTriggerButton();
     }
@@ -492,6 +561,10 @@
   function removeStaleUI() {
     document.getElementById(CARD_ID)?.remove();
     document.getElementById(TRIGGER_ID)?.remove();
+    // Clear saved card position so each new job starts at the default corner
+    if (isExtensionAlive()) {
+      try { chrome.storage.local.remove('cardPos'); } catch (_) {}
+    }
   }
 
   // Decide auto vs manual based on stored setting

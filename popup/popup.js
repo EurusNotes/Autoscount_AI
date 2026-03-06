@@ -71,10 +71,19 @@ function loadProfile() {
     document.getElementById('apiProvider').value = provider;
     updateProviderUI(provider);
 
+    // Refresh char counter after textarea value is set
+    document.getElementById('workHistory')?.dispatchEvent(new Event('input'));
+
     const isAuto = data.autoMode === true;
     document.getElementById('autoModeToggle').checked = isAuto;
     applyModeUI(isAuto);
   });
+}
+
+function setKeyStatus(state, text) {
+  const el = document.getElementById('keyStatus');
+  el.className = `key-status ${state}`;
+  el.textContent = text;
 }
 
 function saveProfile(e) {
@@ -88,17 +97,39 @@ function saveProfile(e) {
 
   if (!profile.apiKey) {
     showToast('Please enter your API Key first', true);
-    document.getElementById('apiKey').focus();
+    highlightApiKeyField();
     return;
   }
 
-  chrome.storage.local.set(profile, () => {
-    if (chrome.runtime.lastError) {
-      showToast('Save failed, please try again', true);
-    } else {
-      showToast('✓ Profile saved');
+  const saveBtn = document.getElementById('saveBtn');
+  const originalHTML = saveBtn.innerHTML;
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = `<div class="parse-spinner"></div> Validating…`;
+  setKeyStatus('validating', 'Checking…');
+
+  chrome.runtime.sendMessage(
+    { action: 'validate_key', provider: profile.apiProvider || 'gemini', apiKey: profile.apiKey },
+    (response) => {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalHTML;
+
+      if (chrome.runtime.lastError || !response?.valid) {
+        const msg = response?.error || chrome.runtime.lastError?.message || 'Validation failed';
+        setKeyStatus('invalid', '✗ Invalid');
+        showToast(msg, true);
+        return;
+      }
+
+      setKeyStatus('valid', '✓ Valid');
+      chrome.storage.local.set(profile, () => {
+        if (chrome.runtime.lastError) {
+          showToast('Save failed, please try again', true);
+        } else {
+          showToast('✓ Profile saved');
+        }
+      });
     }
-  });
+  );
 }
 
 // ── Resume PDF parsing ─────────────────────────────────────────────────────────
@@ -225,15 +256,38 @@ function setupResumeUpload() {
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
+function setupWorkHistoryCounter() {
+  const textarea = document.getElementById('workHistory');
+  const counter  = document.getElementById('workHistoryCount');
+  const hint     = document.getElementById('workHistoryHint');
+  const LIMIT    = 400;
+
+  function update() {
+    const len = textarea.value.length;
+    counter.textContent = `${len} / ${LIMIT}`;
+    const over = len > LIMIT;
+    counter.classList.toggle('over', over);
+    hint.style.display = over ? 'block' : 'none';
+  }
+
+  textarea.addEventListener('input', update);
+  update(); // initialise on load
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadProfile();
   setupVisibilityToggle();
   setupModeToggle();
   setupResumeUpload();
+  setupWorkHistoryCounter();
   document.getElementById('profileForm').addEventListener('submit', saveProfile);
 
   // Update key label/placeholder/hint live when provider changes
   document.getElementById('apiProvider').addEventListener('change', (e) => {
     updateProviderUI(e.target.value);
+    setKeyStatus('', ''); // clear stale validation badge on provider switch
   });
+
+  // Clear validation badge when the key is edited
+  document.getElementById('apiKey').addEventListener('input', () => setKeyStatus('', ''));
 });

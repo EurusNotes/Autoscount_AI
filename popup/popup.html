@@ -38,7 +38,10 @@
       </div>
 
       <div class="field">
-        <label for="apiKey" id="apiKeyLabel">API Key</label>
+        <div class="field-label-row">
+          <label for="apiKey" id="apiKeyLabel">API Key</label>
+          <span class="key-status" id="keyStatus"></span>
+        </div>
         <div class="input-wrapper">
           <input
             type="password"
@@ -137,13 +140,17 @@
       </div>
 
       <div class="field">
-        <label for="workHistory">Work & Project History</label>
+        <div class="field-label-row">
+          <label for="workHistory">Work & Project History</label>
+          <span class="char-count" id="workHistoryCount">0 / 400</span>
+        </div>
         <textarea
           id="workHistory"
           name="workHistory"
           rows="4"
           placeholder="e.g. 1 yr as ML Engineer at Acme — built recommendation engine. Final year project: LLM-based code reviewer."
         ></textarea>
+        <p class="field-hint" id="workHistoryHint" style="display:none;color:#dc2626">Characters beyond 400 won't be sent to the LLM.</p>
       </div>
 
       <button type="submit" class="btn-save" id="saveBtn">
