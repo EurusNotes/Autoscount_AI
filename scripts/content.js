@@ -29,10 +29,26 @@
   }
 
   // Try a list of CSS selectors, return the first match with meaningful text
-  function extractBySelectors(selectors) {
+  function extractBySelectors(selectors, root) {
+    const scope = root || document;
     for (const sel of selectors) {
-      const el = document.querySelector(sel);
+      const el = scope.querySelector(sel);
       if (el?.innerText?.trim().length > 100) return el.innerText.trim();
+    }
+    return null;
+  }
+
+  // Locate LinkedIn's right-hand detail panel (not the left job-list column)
+  function linkedInDetailPanel() {
+    const candidates = [
+      '.jobs-search__job-details--wrapper',
+      '.scaffold-layout__detail',
+      '[data-view-name="job-details"]',
+      '.jobs-details',
+    ];
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      if (el) return el;
     }
     return null;
   }
@@ -62,10 +78,19 @@
         '[class*="jobDescription"]', 'article[class*="job"]',
       ]);
     } else if (host.includes('linkedin.com')) {
+      // Scope ALL selectors to the right-hand detail panel so we never
+      // accidentally grab content from the left-side job-list column.
+      const panel = linkedInDetailPanel();
       text = extractBySelectors([
-        '.jobs-description__content', '.jobs-box__html-content',
-        '[class*="job-description"]', '.description__text',
-      ]);
+        '#job-details',
+        '.jobs-description__content',
+        '.jobs-description-content__text',
+        '.jobs-box__html-content',
+        '.jobs-description',
+        'article',
+      ], panel || undefined);
+      // For LinkedIn, if still nothing, try the full panel text but NOT body
+      if (!text && panel) text = panel.innerText?.trim() || null;
     } else if (host.includes('indeed.com')) {
       text = extractBySelectors([
         '#jobDescriptionText', '.jobsearch-jobDescriptionText',
@@ -93,9 +118,13 @@
       ]);
     }
 
-    // Generic fallback for unlisted sites or when site-specific selectors miss
-    if (!text) text = extractGenericJD();
-    if (!text || text.length < 100) text = document.body.innerText.trim();
+    // Generic fallback for unlisted sites or when site-specific selectors miss.
+    // LinkedIn must NOT fall back to body.innerText (contains whole left panel).
+    const isLinkedIn = host.includes('linkedin.com');
+    if (!text && !isLinkedIn) text = extractGenericJD();
+    if (!text || text.length < 100) {
+      if (!isLinkedIn) text = document.body.innerText.trim();
+    }
 
     return cleanText(text);
   }
@@ -574,9 +603,11 @@
         'h1[class*="Title"]', 'h1[class*="title"]',
       ],
       'linkedin.com': [
-        'h1.jobs-unified-top-card__job-title',
         '.job-details-jobs-unified-top-card__job-title h1',
-        'h1[class*="job-title"]', 'h1[class*="jobs"]',
+        'h1.jobs-unified-top-card__job-title',
+        '.jobs-details h1',
+        '.artdeco-entity-lockup__title h1',
+        'h1.t-24',
       ],
       'indeed.com': [
         'h1.jobsearch-JobInfoHeader-title',
@@ -599,8 +630,12 @@
 
     for (const [domain, selectors] of Object.entries(SITE_SELECTORS)) {
       if (host.includes(domain)) {
+        // For LinkedIn, scope title search to the right-hand detail panel
+        const scope = host.includes('linkedin.com')
+          ? (linkedInDetailPanel() || document)
+          : document;
         for (const sel of selectors) {
-          const el = document.querySelector(sel);
+          const el = scope.querySelector(sel);
           if (el?.innerText?.trim()) return el.innerText.trim();
         }
         break;
@@ -717,7 +752,20 @@
     _origPushState.apply(this, args);
     onUrlChange();
   };
+
+  const _origReplaceState = history.replaceState;
+  history.replaceState = function (...args) {
+    _origReplaceState.apply(this, args);
+    onUrlChange();
+  };
+
   window.addEventListener('popstate', onUrlChange);
+
+  // Polling fallback: catches SPAs that update the URL without using the
+  // History API (e.g. LinkedIn's split-panel job switching).
+  setInterval(() => {
+    if (isExtensionAlive()) onUrlChange();
+  }, 750);
 
   // ── Boot ───────────────────────────────────────────────────────────────────
 
