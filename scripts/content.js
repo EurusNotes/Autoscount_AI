@@ -53,6 +53,30 @@
     return null;
   }
 
+  // Extract job description from Schema.org JobPosting structured data.
+  // Many job sites (Seek, Indeed, Glassdoor, company career pages) embed this
+  // in <script type="application/ld+json"> — it's the most reliable
+  // site-agnostic signal available.
+  function extractFromStructuredData() {
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const s of scripts) {
+      let data;
+      try { data = JSON.parse(s.textContent); } catch (_) { continue; }
+      // The root object may be a single posting or a @graph array
+      const nodes = Array.isArray(data?.['@graph']) ? data['@graph']
+                  : Array.isArray(data)              ? data
+                  : [data];
+      const posting = nodes.find(n => n?.['@type'] === 'JobPosting');
+      if (!posting?.description) continue;
+      // description is usually HTML — strip tags to get plain text
+      const div = document.createElement('div');
+      div.innerHTML = posting.description;
+      const text = div.innerText.trim();
+      if (text.length >= 100) return text;
+    }
+    return null;
+  }
+
   // Generic fallback: pick the longest content block, then body
   function extractGenericJD() {
     const candidates = [...document.querySelectorAll(
@@ -121,6 +145,7 @@
     // Generic fallback for unlisted sites or when site-specific selectors miss.
     // LinkedIn must NOT fall back to body.innerText (contains whole left panel).
     const isLinkedIn = host.includes('linkedin.com');
+    if (!text) text = extractFromStructuredData();
     if (!text && !isLinkedIn) text = extractGenericJD();
     if (!text || text.length < 100) {
       if (!isLinkedIn) text = document.body.innerText.trim();
@@ -708,9 +733,15 @@
       S = STRINGS[outputLanguage] || STRINGS.en;
 
       if (!isJobPage()) {
-        // Page not recognised as a job listing — always show manual button
-        // so the user can still trigger analysis themselves
-        buildTriggerButton();
+        // For known sites, always show the manual button so the user can
+        // trigger analysis even on non-job pages (e.g. search results).
+        // For unknown sites, only show it if the page content looks like a
+        // job listing — avoids injecting a floating button on every website.
+        const isKnownSite = [
+          'seek.com.au', 'linkedin.com', 'indeed.com', 'glassdoor.com',
+          'otta.com', 'hatch.team', 'prosple.com',
+        ].some(d => window.location.hostname.includes(d));
+        if (isKnownSite) buildTriggerButton();
         return;
       }
 

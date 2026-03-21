@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AutoScout AI",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Automatically evaluates job listings against your profile and injects a real-time match card.",
   "icons": {
     "48": "icons/icon48.png",
@@ -19,28 +19,14 @@
     "activeTab"
   ],
   "host_permissions": [
-    "*://*.seek.com.au/*",
-    "*://*.linkedin.com/*",
-    "*://*.indeed.com/*",
-    "*://*.glassdoor.com/*",
-    "*://*.otta.com/*",
-    "*://*.hatch.team/*",
-    "*://*.prosple.com/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "scripts/background.js"
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://*.seek.com.au/*",
-        "*://*.linkedin.com/*",
-        "*://*.indeed.com/*",
-        "*://*.glassdoor.com/*",
-        "*://*.otta.com/*",
-        "*://*.hatch.team/*",
-        "*://*.prosple.com/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["scripts/content.js"],
       "css": ["scripts/content.css"],
       "run_at": "document_idle"

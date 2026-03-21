@@ -39,6 +39,10 @@
 
 ## Supported Sites
 
+AutoScout AI works on **any website** — not just the ones listed below.
+
+### Natively supported (precise URL detection)
+
 | Site | Detection method |
 |------|-----------------|
 | **Seek** | `/job/` path or `?jobId=` query param |
@@ -46,9 +50,17 @@
 | **Indeed** | `?jk=` query param or `/viewjob` path |
 | **Glassdoor** | `/job-listing/`, `/Job/`, `/jobs/` paths |
 | **Otta** | `/jobs/` path |
+| **Hatch** | `/jobs/` or `/role/` paths |
 | **Prosple** | `/graduate-jobs/`, `/internships/`, `/jobs/` paths |
 
-> On any other site, a floating **"Analyze this job"** button appears if the page looks like a job listing, so you can trigger analysis manually anywhere.
+### Any other site (automatic detection)
+
+On sites not in the list above, the extension detects job pages through two signals — no configuration needed:
+
+1. **Schema.org structured data** — many job boards and company career pages embed a `JobPosting` block in their page source. The extension reads this directly, giving clean and reliable extraction.
+2. **Keyword heuristics** — if the page text contains enough job-listing language (e.g. "responsibilities", "requirements", "apply now"), the extension treats it as a job page.
+
+When a page is detected as a job listing, the green **"Analyze this job"** button appears automatically. On pages that don't look like job listings, no UI is injected.
 
 ---
 
